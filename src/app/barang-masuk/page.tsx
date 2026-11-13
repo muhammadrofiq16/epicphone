@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   X,
+  Plus,
   Smartphone,
   CheckCircle2,
   AlertTriangle,
@@ -13,6 +14,7 @@ import {
   Loader2,
   Cloud,
   HardDrive,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { PaymentMethod } from '@/types';
@@ -135,13 +137,18 @@ function BarangMasukContent() {
     setTanggalMasuk(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // Foto 4 Slots
-  const [fotoDepan, setFotoDepan] = useState<string | null>(null);
-  const [fotoBelakang, setFotoBelakang] = useState<string | null>(null);
-  const [fotoImei, setFotoImei] = useState<string | null>(null);
-  const [fotoDus, setFotoDus] = useState<string | null>(null);
-  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
-  const [uploadProviders, setUploadProviders] = useState<Record<string, string>>({});
+  // Foto Produk (Batch Multiple Upload, Max 10 Foto)
+  interface UploadedPhoto {
+    id: string;
+    url: string;
+    isUploading?: boolean;
+    provider?: string;
+    name?: string;
+  }
+
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [isUploadingMultiple, setIsUploadingMultiple] = useState(false);
+  const multipleFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Catatan & Servis
   const [catatanUnit, setCatatanUnit] = useState('');
@@ -166,66 +173,79 @@ function BarangMasukContent() {
     }
   };
 
-  // Handle real image upload (Cloudinary + Local Backup)
-  const handleImageUpload = async (
-    slot: 'depan' | 'belakang' | 'imei' | 'dus',
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Handle Multiple Image Upload (Bisa banyak sekaligus, maks 10)
+  const handleBatchImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    // Instant local preview for zero-delay UX
-    const localPreview = URL.createObjectURL(file);
-    if (slot === 'depan') setFotoDepan(localPreview);
-    if (slot === 'belakang') setFotoBelakang(localPreview);
-    if (slot === 'imei') setFotoImei(localPreview);
-    if (slot === 'dus') setFotoDus(localPreview);
+    const remainingSlots = 10 - photos.length;
+    if (remainingSlots <= 0) {
+      setErrorMsg('Maksimal 10 foto sudah tercapai.');
+      return;
+    }
 
-    try {
-      setUploadingSlot(slot);
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('slot', slot);
-      fd.append('unitTipe', `${merek} ${modelSeri}`);
+    const filesToUpload = files.slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      setErrorMsg(`Hanya ${remainingSlots} foto yang dapat ditambahkan (maksimal 10 foto).`);
+    }
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: fd,
-      });
+    // Buat item preview lokal instan agar UI langsung responsif
+    const newItems: UploadedPhoto[] = filesToUpload.map((f, idx) => ({
+      id: `photo-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+      url: URL.createObjectURL(f),
+      isUploading: true,
+      name: f.name,
+    }));
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal mengupload foto');
-      }
+    setPhotos((prev) => [...prev, ...newItems]);
+    setIsUploadingMultiple(true);
 
-      // Set final persistent URL (Cloudinary secure_url or /uploads/units/...)
-      const finalUrl = data.url;
-      if (slot === 'depan') setFotoDepan(finalUrl);
-      if (slot === 'belakang') setFotoBelakang(finalUrl);
-      if (slot === 'imei') setFotoImei(finalUrl);
-      if (slot === 'dus') setFotoDus(finalUrl);
+    // Upload semua foto secara paralel agar proses sangat cepat
+    await Promise.all(
+      filesToUpload.map(async (file, i) => {
+        const targetId = newItems[i].id;
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('slot', `unit-${i + 1}`);
+          fd.append('unitTipe', `${merek || 'Unit'} ${modelSeri || 'HP'}`);
 
-      setUploadProviders((prev) => ({ ...prev, [slot]: data.provider }));
-    } catch (err: any) {
-      console.error('Upload failed:', err);
-      setErrorMsg(`Gagal upload foto ${slot}: ${err.message}`);
-    } finally {
-      setUploadingSlot(null);
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: fd,
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Gagal mengupload');
+          }
+
+          const finalUrl = data.url || data.localUrl;
+          setPhotos((prev) =>
+            prev.map((item) =>
+              item.id === targetId
+                ? { ...item, url: finalUrl, isUploading: false, provider: data.provider }
+                : item
+            )
+          );
+        } catch (err: any) {
+          console.error('Batch upload error:', file.name, err);
+          setPhotos((prev) => prev.filter((item) => item.id !== targetId));
+          setErrorMsg(`Gagal upload foto "${file.name}": ${err.message}`);
+        }
+      })
+    );
+
+    setIsUploadingMultiple(false);
+    if (e.target) {
+      e.target.value = '';
     }
   };
 
-  const removeFoto = (slot: 'depan' | 'belakang' | 'imei' | 'dus', e: React.MouseEvent) => {
+  const removePhoto = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (slot === 'depan') setFotoDepan(null);
-    if (slot === 'belakang') setFotoBelakang(null);
-    if (slot === 'imei') setFotoImei(null);
-    if (slot === 'dus') setFotoDus(null);
-    setUploadProviders((prev) => {
-      const copy = { ...prev };
-      delete copy[slot];
-      return copy;
-    });
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
   const handleSave = async (stayOnPage = false) => {
@@ -253,7 +273,7 @@ function BarangMasukContent() {
     try {
       setSubmitting(true);
 
-      const fotos = [fotoDepan, fotoBelakang, fotoImei, fotoDus].filter(Boolean) as string[];
+      const fotos = photos.filter((p) => !p.isUploading && p.url).map((p) => p.url);
 
       const res = await fetch('/api/purchases', {
         method: 'POST',
@@ -294,10 +314,7 @@ function BarangMasukContent() {
         setImei('');
         setHargaBeli('');
         setCatatanUnit('');
-        setFotoDepan(null);
-        setFotoBelakang(null);
-        setFotoImei(null);
-        setFotoDus(null);
+        setPhotos([]);
         setTimeout(() => setSuccessMsg(''), 3000);
       } else {
         setTimeout(() => router.push('/stok'), 1000);
@@ -742,194 +759,140 @@ function BarangMasukContent() {
 
       {/* RIGHT COLUMN: Foto Dokumentasi, Catatan, & Tombol Simpan */}
       <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-20">
-        {/* SECTION: FOTO UNIT (4 SLOTS) - As seen in screenshot */}
-        <div className="bg-white dark:bg-[#142036] rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2.5">
+        {/* SECTION: FOTO DOKUMENTASI (MULTI UPLOAD, MAKS 10 FOTO) */}
+        <div className="bg-white dark:bg-[#142036] rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-xs text-slate-900 dark:text-white">Foto Unit & Kelengkapan</h2>
-              <p className="text-[10px] text-slate-400">
-                Tersimpan di direktori & siap dipromosikan ke Instagram/Facebook
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-xs text-slate-900 dark:text-white">Foto Unit & Kelengkapan</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-900/80">
+                  {photos.length}/10 Foto
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Bisa pilih banyak foto sekaligus dari galeri (depan, belakang, IMEI, dus, dll)
               </p>
             </div>
-            <span className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 flex items-center gap-1">
+            <span className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 flex items-center gap-1 shrink-0">
               <Cloud className="w-3 h-3 text-blue-500" />
               Auto-Sync
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-            {/* Slot 1: Tampak Depan */}
-            <label className="relative border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-2 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-[#101b30] transition-colors h-24 overflow-hidden group">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploadingSlot === 'depan'}
-                onChange={(e) => handleImageUpload('depan', e)}
-              />
-              {uploadingSlot === 'depan' ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin mb-1" />
-                  <span className="text-[10px] text-blue-500 font-semibold">Mengunggah...</span>
-                </div>
-              ) : fotoDepan ? (
-                <>
-                  <img src={fotoDepan} alt="Depan" className="w-full h-full object-cover rounded-xl" />
-                  <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    {uploadProviders['depan'] === 'cloudinary' ? (
-                      <><Cloud className="w-2.5 h-2.5 text-blue-400" /> Cloud</>
-                    ) : (
-                      <><HardDrive className="w-2.5 h-2.5 text-slate-300" /> Lokal</>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => removeFoto('depan', e)}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 shadow-xs"
-                    title="Hapus Foto"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-5 h-5 text-slate-400 mb-1 group-hover:text-slate-600 transition-colors" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-tight">
-                    Tampak Depan
-                  </span>
-                </>
-              )}
-            </label>
+          {/* Hidden multi-file input */}
+          <input
+            ref={multipleFileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            className="hidden"
+            disabled={photos.length >= 10 || isUploadingMultiple}
+            onChange={handleBatchImageUpload}
+          />
 
-            {/* Slot 2: Tampak Belakang */}
-            <label className="relative border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-2 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-[#101b30] transition-colors h-24 overflow-hidden group">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploadingSlot === 'belakang'}
-                onChange={(e) => handleImageUpload('belakang', e)}
-              />
-              {uploadingSlot === 'belakang' ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin mb-1" />
-                  <span className="text-[10px] text-blue-500 font-semibold">Mengunggah...</span>
-                </div>
-              ) : fotoBelakang ? (
-                <>
-                  <img src={fotoBelakang} alt="Belakang" className="w-full h-full object-cover rounded-xl" />
-                  <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    {uploadProviders['belakang'] === 'cloudinary' ? (
-                      <><Cloud className="w-2.5 h-2.5 text-blue-400" /> Cloud</>
-                    ) : (
-                      <><HardDrive className="w-2.5 h-2.5 text-slate-300" /> Lokal</>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => removeFoto('belakang', e)}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 shadow-xs"
-                    title="Hapus Foto"
+          {/* Dropzone jika belum ada foto sama sekali */}
+          {photos.length === 0 ? (
+            <div
+              onClick={() => multipleFileInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 rounded-2xl p-5 text-center cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900 flex flex-col items-center justify-center gap-2 group"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform">
+                <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <span className="font-bold text-xs text-slate-800 dark:text-white block">
+                  Pilih & Upload Foto Sekaligus
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+                  Pilih hingga 10 foto langsung dari galeri HP atau laptop
+                </span>
+              </div>
+              <span className="mt-1 px-3 py-1.5 bg-[#0c1e38] dark:bg-blue-600 text-white rounded-xl text-[10px] font-semibold shadow-2xs flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5" />
+                <span>Buka Galeri Foto</span>
+              </span>
+            </div>
+          ) : (
+            /* Grid Foto yang telah diupload */
+            <div className="space-y-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
+                {photos.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 group shadow-2xs"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-5 h-5 text-slate-400 mb-1 group-hover:text-slate-600 transition-colors" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-tight">
-                    Tampak Belakang
-                  </span>
-                </>
-              )}
-            </label>
+                    <img
+                      src={item.url}
+                      alt={`Foto ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
 
-            {/* Slot 3: Stiker IMEI */}
-            <label className="relative border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-2 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-[#101b30] transition-colors h-24 overflow-hidden group">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploadingSlot === 'imei'}
-                onChange={(e) => handleImageUpload('imei', e)}
-              />
-              {uploadingSlot === 'imei' ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin mb-1" />
-                  <span className="text-[10px] text-blue-500 font-semibold">Mengunggah...</span>
-                </div>
-              ) : fotoImei ? (
-                <>
-                  <img src={fotoImei} alt="IMEI" className="w-full h-full object-cover rounded-xl" />
-                  <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    {uploadProviders['imei'] === 'cloudinary' ? (
-                      <><Cloud className="w-2.5 h-2.5 text-blue-400" /> Cloud</>
-                    ) : (
-                      <><HardDrive className="w-2.5 h-2.5 text-slate-300" /> Lokal</>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => removeFoto('imei', e)}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 shadow-xs"
-                    title="Hapus Foto"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-5 h-5 text-slate-400 mb-1 group-hover:text-slate-600 transition-colors" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-tight">
-                    Stiker / Menu IMEI
-                  </span>
-                </>
-              )}
-            </label>
+                    {/* Badge Nomor Foto */}
+                    <span className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                      {idx === 0 ? '★ Utama' : `#${idx + 1}`}
+                    </span>
 
-            {/* Slot 4: Dus & Kelengkapan */}
-            <label className="relative border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-2 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-[#101b30] transition-colors h-24 overflow-hidden group">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploadingSlot === 'dus'}
-                onChange={(e) => handleImageUpload('dus', e)}
-              />
-              {uploadingSlot === 'dus' ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin mb-1" />
-                  <span className="text-[10px] text-blue-500 font-semibold">Mengunggah...</span>
-                </div>
-              ) : fotoDus ? (
-                <>
-                  <img src={fotoDus} alt="Dus" className="w-full h-full object-cover rounded-xl" />
-                  <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    {uploadProviders['dus'] === 'cloudinary' ? (
-                      <><Cloud className="w-2.5 h-2.5 text-blue-400" /> Cloud</>
+                    {/* Status Spinner atau Tombol Hapus */}
+                    {item.isUploading ? (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-400 mb-0.5" />
+                        <span className="text-[8px] font-semibold">Upload...</span>
+                      </div>
                     ) : (
-                      <><HardDrive className="w-2.5 h-2.5 text-slate-300" /> Lokal</>
+                      <button
+                        type="button"
+                        onClick={(e) => removePhoto(item.id, e)}
+                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/65 hover:bg-rose-600 text-white flex items-center justify-center transition-colors shadow-xs"
+                        title="Hapus Foto"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     )}
-                  </span>
+
+                    {/* Storage Provider */}
+                    {!item.isUploading && (
+                      <span className="absolute bottom-1.5 right-1.5 bg-black/70 backdrop-blur-xs text-white text-[7px] font-mono px-1 py-0.2 rounded">
+                        {item.provider === 'cloudinary' ? '☁️ Cloud' : '💾 Simpan'}
+                      </span>
+                    )}
+                  </div>
+                ))}
+
+                {/* Tombol Tambah Foto (+ Tambah) jika belum 10 */}
+                {photos.length < 10 && (
                   <button
                     type="button"
-                    onClick={(e) => removeFoto('dus', e)}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90 shadow-xs"
-                    title="Hapus Foto"
+                    onClick={() => multipleFileInputRef.current?.click()}
+                    disabled={isUploadingMultiple}
+                    className="aspect-square border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center p-2 text-center hover:bg-slate-50 dark:hover:bg-[#101b30] transition-colors group cursor-pointer disabled:opacity-50"
                   >
-                    <X className="w-3 h-3" />
+                    <Plus className="w-5 h-5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 mb-1 transition-colors" />
+                    <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 leading-tight">
+                      + Tambah
+                    </span>
+                    <span className="text-[8px] text-slate-400 mt-0.5">
+                      {10 - photos.length} slot lagi
+                    </span>
                   </button>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-5 h-5 text-slate-400 mb-1 group-hover:text-slate-600 transition-colors" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-tight">
-                    Dus & Kelengkapan
-                  </span>
-                </>
-              )}
-            </label>
-          </div>
+                )}
+              </div>
+
+              {/* Tips & Quick Action Button */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                <span>Foto pertama (★ Utama) otomatis jadi sampul di etalase stok.</span>
+                {photos.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => multipleFileInputRef.current?.click()}
+                    disabled={isUploadingMultiple}
+                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline shrink-0 ml-2"
+                  >
+                    + Tambah Lagi
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SECTION: CATATAN & SERVIS */}
