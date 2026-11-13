@@ -267,7 +267,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
 
       {/* Filter Tabs & View Mode Switcher */}
       <div className="flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar flex-1">
+        <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar flex-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {statusTabs.map((tab) => {
             const isActive = selectedStatus === tab;
             return (
@@ -622,7 +622,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                       </div>
 
                       {detailPhotos.length > 1 && (
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                        <div className="flex items-center gap-2 overflow-x-auto py-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                           {detailPhotos.map((url: string, idx: number) => (
                             <button
                               key={idx}
