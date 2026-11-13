@@ -9,12 +9,14 @@ export function getDb(): Client {
       process.env.TURSO_DATABASE_URL ||
       process.env.TURSO_DB_URL ||
       process.env.TURSO_URL ||
-      process.env.STORAGE_URL;
+      process.env.STORAGE_URL ||
+      process.env.LIBSQL_URL;
     const tursoAuthToken =
       process.env.TURSO_AUTH_TOKEN ||
       process.env.TURSO_TOKEN ||
       process.env.STORAGE_AUTH_TOKEN ||
-      process.env.STORAGE_TOKEN;
+      process.env.STORAGE_TOKEN ||
+      process.env.LIBSQL_AUTH_TOKEN;
 
     if (tursoUrl) {
       dbClient = createClient({
