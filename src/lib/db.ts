@@ -5,7 +5,7 @@ let dbClient: Client | null = null;
 
 export function getDb(): Client {
   if (!dbClient) {
-    const tursoUrl = process.env.TURSO_DATABASE_URL;
+    const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.TURSO_DB_URL;
     const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
 
     if (tursoUrl) {
