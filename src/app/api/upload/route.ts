@@ -56,15 +56,9 @@ export async function POST(request: NextRequest) {
       ? `store-logo-${timestamp}-${randomSuffix}.${extension}`
       : `${safeTipe}-${slot}-${timestamp}-${randomSuffix}.${extension}`;
 
-    // 1. Always save a local copy to public/uploads/ (units or branding)
     const subFolder = isLogo ? 'branding' : 'units';
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', subFolder);
-    await fs.mkdir(uploadDir, { recursive: true });
-    const localFilePath = path.join(uploadDir, localFileName);
-    await fs.writeFile(localFilePath, buffer);
-    const localUrl = `/uploads/${subFolder}/${localFileName}`;
 
-    // 2. If Cloudinary is configured, upload to Cloudinary
+    // 1. If Cloudinary is configured, prioritize uploading to Cloudinary
     if (isCloudinaryConfigured) {
       try {
         const cloudResult = await uploadImageToCloudinary(buffer, {
@@ -74,11 +68,21 @@ export async function POST(request: NextRequest) {
           watermarkText: isLogo ? undefined : 'EpicPhone Store',
         });
 
+        // Safely try saving a local copy in dev environment (ignore EROFS in serverless)
+        try {
+          const uploadDir = path.join(process.cwd(), 'public', 'uploads', subFolder);
+          await fs.mkdir(uploadDir, { recursive: true });
+          const localFilePath = path.join(uploadDir, localFileName);
+          await fs.writeFile(localFilePath, buffer);
+        } catch {
+          // Read-only filesystem on Vercel is expected and safely ignored
+        }
+
         return NextResponse.json({
           success: true,
           provider: 'cloudinary',
           url: cloudResult.secure_url,
-          localUrl,
+          localUrl: cloudResult.secure_url,
           public_id: cloudResult.public_id,
           ig_square_url: cloudResult.ig_square_url,
           ig_portrait_url: cloudResult.ig_portrait_url,
@@ -86,27 +90,46 @@ export async function POST(request: NextRequest) {
           fileName: localFileName,
         });
       } catch (cloudErr: any) {
-        console.error('Cloudinary upload error, falling back to local storage:', cloudErr);
-        // Fallback to local storage if Cloudinary fails
-        return NextResponse.json({
-          success: true,
-          provider: 'local_fallback',
-          url: localUrl,
-          localUrl,
-          fileName: localFileName,
-          warning: 'Gagal mengunggah ke Cloudinary, foto diamankan di penyimpanan lokal: ' + cloudErr.message,
-        });
+        console.error('Cloudinary upload error:', cloudErr);
       }
     }
 
-    // 3. Cloudinary not configured yet, return local URL
+    // 2. Try saving to local filesystem (development environment)
+    let localSaved = false;
+    const localUrl = `/uploads/${subFolder}/${localFileName}`;
+    try {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', subFolder);
+      await fs.mkdir(uploadDir, { recursive: true });
+      const localFilePath = path.join(uploadDir, localFileName);
+      await fs.writeFile(localFilePath, buffer);
+      localSaved = true;
+    } catch {
+      // Serverless environment like Vercel has read-only filesystem
+      console.warn('Filesystem is read-only (serverless environment like Vercel).');
+    }
+
+    if (localSaved) {
+      return NextResponse.json({
+        success: true,
+        provider: 'local',
+        url: localUrl,
+        localUrl,
+        fileName: localFileName,
+        message: 'Foto berhasil disimpan di direktori lokal server.',
+      });
+    }
+
+    // 3. Fallback for Vercel when Cloudinary is not yet configured: Base64 Data URL
+    // This guarantees the upload NEVER fails with EROFS error!
+    const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
     return NextResponse.json({
       success: true,
-      provider: 'local',
-      url: localUrl,
-      localUrl,
+      provider: 'base64_fallback',
+      url: base64Data,
+      localUrl: base64Data,
       fileName: localFileName,
-      message: 'Foto berhasil disimpan di direktori lokal server.',
+      warning:
+        'Foto disimpan sebagai Data URL karena Cloudinary belum aktif di Vercel. Tambahkan CLOUDINARY_URL di Environment Variables Vercel untuk performa cloud optimal.',
     });
   } catch (error: any) {
     console.error('Upload handler error:', error);
