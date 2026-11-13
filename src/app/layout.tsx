@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
@@ -15,9 +15,33 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+export const viewport: Viewport = {
+  themeColor: '#0c1e38',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
   title: 'EpicPhone - Sistem Inventory & Keuangan HP Second',
   description: 'Aplikasi manajemen stok unit iPhone second, penjualan, servis, dan laba otomatis.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/images/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/images/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/images/logo.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/images/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'EpicPhone',
+  },
 };
 
 export default function RootLayout({
