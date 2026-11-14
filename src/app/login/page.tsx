@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Smartphone,
-  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -66,13 +65,6 @@ export default function LoginPage() {
       setErrorMsg(err.message || 'Terjadi kesalahan sistem');
       setSubmitting(false);
     }
-  };
-
-  // Helper untuk auto-fill akun default
-  const fillCredentials = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMsg('');
   };
 
   return (
@@ -208,53 +200,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Credentials Info for Easy Onboarding */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 mb-2.5">
-            <KeyRound className="w-3.5 h-3.5 text-blue-400" />
-            <span>Akun Default Sistem (Klik untuk isi cepat):</span>
+        {/* Security Notice */}
+        <div className="mt-6 pt-4 border-t border-slate-800/80 text-center">
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-500/80" />
+            <span>Sistem Terproteksi · Akses Terbatas Staf & Pemilik</span>
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => fillCredentials('pemilik', 'admin123')}
-              className="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-blue-500/50 text-left transition-all group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-white group-hover:text-blue-400">
-                  👑 Pemilik
-                </span>
-                <span className="text-[9px] bg-blue-950 text-blue-300 px-1.5 py-0.2 rounded font-mono">
-                  Full
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
-                pemilik · admin123
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => fillCredentials('karyawan', 'karyawan123')}
-              className="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-left transition-all group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-300 group-hover:text-white">
-                  👤 Karyawan
-                </span>
-                <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.2 rounded font-mono">
-                  Kasir
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">
-                karyawan · karyawan123
-              </p>
-            </button>
-          </div>
-          <p className="text-[10px] text-slate-500 text-center mt-3">
-            Kata sandi dapat diubah kapan saja di menu Pengaturan.
-          </p>
         </div>
       </div>
 
