@@ -50,6 +50,62 @@ export async function getUserById(id: number): Promise<User | null> {
   };
 }
 
+export async function authenticateUser(username: string, kataSandi: string): Promise<User | null> {
+  const db = await ensureDb();
+  const cleanUsername = username.trim().toLowerCase();
+  const res = await db.execute({
+    sql: 'SELECT id, nama, username, kata_sandi, peran, aktif FROM pengguna WHERE LOWER(username) = ? AND aktif = 1',
+    args: [cleanUsername],
+  });
+
+  if (res.rows.length === 0) return null;
+  const user = res.rows[0];
+
+  if (String(user.kata_sandi) !== kataSandi) {
+    return null;
+  }
+
+  return {
+    id: Number(user.id),
+    nama: String(user.nama),
+    username: String(user.username),
+    peran: user.peran as UserRole,
+    aktif: Boolean(user.aktif),
+  };
+}
+
+export async function updatePassword(
+  userId: number,
+  kataSandiLama: string,
+  kataSandiBaru: string
+): Promise<{ success: boolean; message?: string }> {
+  const db = await ensureDb();
+  const res = await db.execute({
+    sql: 'SELECT id, kata_sandi FROM pengguna WHERE id = ?',
+    args: [userId],
+  });
+
+  if (res.rows.length === 0) {
+    return { success: false, message: 'Pengguna tidak ditemukan' };
+  }
+
+  const currentPass = String(res.rows[0].kata_sandi);
+  if (currentPass !== kataSandiLama) {
+    return { success: false, message: 'Kata sandi lama salah / tidak cocok' };
+  }
+
+  if (!kataSandiBaru || kataSandiBaru.length < 4) {
+    return { success: false, message: 'Kata sandi baru minimal 4 karakter' };
+  }
+
+  await db.execute({
+    sql: 'UPDATE pengguna SET kata_sandi = ? WHERE id = ?',
+    args: [kataSandiBaru, userId],
+  });
+
+  return { success: true };
+}
+
 // ----------------- SETTINGS -----------------
 export async function getSettings(): Promise<StoreSettings> {
   const db = await ensureDb();

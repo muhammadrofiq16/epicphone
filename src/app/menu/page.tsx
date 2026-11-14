@@ -14,12 +14,13 @@ import {
   Store,
   Sun,
   Eye,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 
 export default function MenuPage() {
-  const { currentUser, role, users, switchUser } = useAuth();
+  const { currentUser, role, users, switchUser, logout } = useAuth();
   const { isDarkMode, hideNumbers, toggleDarkMode, toggleHideNumbers } = usePreferences();
   const isOwner = role === 'pemilik';
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -235,9 +236,34 @@ export default function MenuPage() {
                 );
               })}
             </div>
+
+            {/* Logout Button in Modal */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoleModal(false);
+                  logout();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Keluar dari Akun (Logout)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Direct Logout Button */}
+      <button
+        type="button"
+        onClick={() => logout()}
+        className="w-full py-3 px-4 rounded-2xl font-bold text-xs bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
+      >
+        <LogOut className="w-4 h-4" />
+        <span>Keluar dari Sistem (Logout)</span>
+      </button>
 
       {/* Footer System Info */}
       <div className="p-3 rounded-2xl bg-white border border-slate-200/70 text-center text-xs text-slate-400 space-y-0.5">

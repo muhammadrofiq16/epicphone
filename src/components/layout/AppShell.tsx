@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   Package,
@@ -28,17 +28,61 @@ import {
   Moon,
   ChevronRight,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser, role, users, switchUser } = useAuth();
+  const router = useRouter();
+  const { currentUser, role, users, switchUser, isLoading, logout } = useAuth();
   const { isDarkMode, hideNumbers, toggleDarkMode, toggleHideNumbers, logoUrl } = usePreferences();
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showQuickAction, setShowQuickAction] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
+
+  // Proteksi Akses Sistem (Route Guard)
+  useEffect(() => {
+    if (!isLoading && !currentUser && pathname !== '/login') {
+      router.push('/login');
+    }
+  }, [isLoading, currentUser, pathname, router]);
+
+  // Jika di halaman Login, tampilkan halaman penuh tanpa shell / navbar
+  if (pathname === '/login') {
+    return <div className={isDarkMode ? 'dark' : ''}>{children}</div>;
+  }
+
+  // Tampilan loading otentikasi
+  if (isLoading && pathname !== '/login') {
+    return (
+      <div className="min-h-screen bg-[#070b13] flex flex-col items-center justify-center text-white">
+        <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-2xl mb-4 border border-slate-800 p-1 bg-[#050b14] animate-pulse">
+          <img
+            src={logoUrl || '/images/icon-192.png'}
+            alt="EpicPhone"
+            className="w-full h-full object-contain"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes('/images/icon-192.png')) {
+                target.src = '/images/icon-192.png';
+              }
+            }}
+          />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></div>
+          <span>Memuat sistem EpicPhone...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Jika belum login dan di luar halaman /login, tahan render
+  if (!currentUser && pathname !== '/login') {
+    return null;
+  }
 
   // Bottom navigation items for mobile
   const mobileNavItems = [
@@ -207,16 +251,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
 
-            {/* User Profile Info */}
-            <div
-              onClick={() => setShowRoleModal(true)}
-              className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#142036] cursor-pointer transition-colors"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
+            {/* User Profile Info & Logout */}
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-[#142036] border border-slate-200/60 dark:border-slate-800">
+              <div
+                onClick={() => setShowRoleModal(true)}
+                className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
+                title="Kelola Akun"
+              >
                 <div className="w-7 h-7 rounded-full bg-[#0c1e38] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                   {currentUser?.nama?.charAt(0) || 'U'}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                     {currentUser?.nama || 'Pengguna'}
                   </div>
@@ -225,7 +270,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               </div>
-              <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">Ganti</span>
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                title="Keluar dari akun (Logout)"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -753,6 +805,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Tombol Logout Resmi */}
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoleModal(false);
+                  logout();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Keluar dari Akun (Logout)</span>
+              </button>
             </div>
           </div>
         </div>
