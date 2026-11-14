@@ -1025,3 +1025,32 @@ export async function getFinancialReport(range: 'hari_ini' | '7_hari' | '30_hari
     })),
   };
 }
+
+// ----------------- RESET DATA (HAPUS SEMUA DATA DEMO) -----------------
+export async function resetAllBusinessData(): Promise<{ success: boolean; message: string }> {
+  const db = await ensureDb();
+
+  await db.executeMultiple(`
+    DELETE FROM pembayaran;
+    DELETE FROM servis;
+    DELETE FROM penjualan;
+    DELETE FROM pembelian;
+    DELETE FROM unit;
+    DELETE FROM pengeluaran;
+    DELETE FROM kontak;
+    DELETE FROM log_perubahan;
+  `);
+
+  try {
+    await db.execute(
+      "DELETE FROM sqlite_sequence WHERE name IN ('pembayaran', 'servis', 'penjualan', 'pembelian', 'unit', 'pengeluaran', 'kontak', 'log_perubahan')"
+    );
+  } catch (e: any) {
+    console.warn('sqlite_sequence reset note:', e?.message);
+  }
+
+  return {
+    success: true,
+    message: 'Semua data stok, transaksi pembelian, penjualan, servis, pengeluaran, dan kontak telah bersih 100%. Akun pengguna dan logo toko tetap aman terjaga.',
+  };
+}

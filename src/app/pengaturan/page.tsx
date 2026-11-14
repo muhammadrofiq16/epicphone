@@ -16,6 +16,7 @@ import {
   Sparkles,
   Lock,
   KeyRound,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -51,6 +52,13 @@ export default function PengaturanPage() {
   const [submittingPassword, setSubmittingPassword] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  // State Reset Data Demo
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [submittingReset, setSubmittingReset] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -211,6 +219,39 @@ export default function PengaturanPage() {
       setPasswordError(err.message || 'Terjadi kesalahan sistem');
     } finally {
       setSubmittingPassword(false);
+    }
+  };
+
+  const handleResetData = async () => {
+    if (resetConfirmText.trim() !== 'HAPUS') {
+      setResetError('Ketik kata HAPUS dengan huruf kapital untuk konfirmasi.');
+      return;
+    }
+
+    try {
+      setSubmittingReset(true);
+      setResetError('');
+      setResetMsg('');
+
+      const res = await fetch('/api/admin/reset-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'HAPUS_DATA_DEMO' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mereset data');
+      }
+
+      setResetMsg(data.message || 'Semua data transaksi dan stok berhasil dibersihkan!');
+      setShowResetConfirm(false);
+      setResetConfirmText('');
+      setTimeout(() => setResetMsg(''), 6000);
+    } catch (err: any) {
+      setResetError(err.message || 'Terjadi kesalahan sistem');
+    } finally {
+      setSubmittingReset(false);
     }
   };
 
@@ -556,6 +597,104 @@ export default function PengaturanPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* SECTION 5: ZONA BAHAYA - RESET DATA SISTEM */}
+      {!loading && isOwner && (
+        <div className="bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl p-4 sm:p-5 border border-rose-200/80 dark:border-rose-900/40 shadow-2xs space-y-3">
+          <div className="border-b border-rose-100 dark:border-rose-900/40 pb-3 flex items-center justify-between">
+            <h2 className="font-bold text-rose-900 dark:text-rose-200 text-xs sm:text-sm flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              <span>Bersihkan Data Demo (Kosongkan Sistem)</span>
+            </h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
+              Khusus Pemilik
+            </span>
+          </div>
+
+          <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80 leading-relaxed">
+            Fitur ini akan menghapus seluruh data contoh/demo: <strong>stok unit, transaksi pembelian, penjualan kasir, servis, pengeluaran, dan kontak</strong> agar sistem bersih total untuk diisi data toko riil Anda.
+            <br />
+            <span className="text-slate-600 dark:text-slate-400 font-medium">
+              *Catatan: Akun login pengguna dan logo toko Anda akan tetap aman tersimpan.
+            </span>
+          </p>
+
+          {resetError && (
+            <div className="p-3 rounded-xl bg-white dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span>{resetError}</span>
+            </div>
+          )}
+
+          {resetMsg && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-600 dark:text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{resetMsg}</span>
+            </div>
+          )}
+
+          {!showResetConfirm ? (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Bersihkan Semua Data Demo</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-4 bg-white dark:bg-[#142036] rounded-2xl border border-rose-300 dark:border-rose-800/80 space-y-3 animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-white mb-1">
+                  Ketik kata <span className="text-rose-600 dark:text-rose-400 font-mono">HAPUS</span> untuk mengonfirmasi:
+                </label>
+                <input
+                  type="text"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  placeholder="Ketik HAPUS..."
+                  className="w-full max-w-xs px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-mono text-xs font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetData}
+                  disabled={submittingReset || resetConfirmText.trim() !== 'HAPUS'}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                >
+                  {submittingReset ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sedang Menghapus Data...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Konfirmasi Hapus Semua Data</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetConfirm(false);
+                    setResetConfirmText('');
+                    setResetError('');
+                  }}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
