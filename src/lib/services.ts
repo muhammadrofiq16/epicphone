@@ -253,7 +253,7 @@ export async function getDashboardSummary(role: UserRole = 'pemilik'): Promise<D
 
   // Transaksi Terakhir (5)
   const recentSalesRes = await db.execute(`
-    SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, usr.nama as pencatat_nama
+    SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, u.imei2 as unit_imei2, usr.nama as pencatat_nama
     FROM penjualan p
     LEFT JOIN unit u ON p.unit_id = u.id
     LEFT JOIN pengguna usr ON p.pencatat_id = usr.id
@@ -269,6 +269,7 @@ export async function getDashboardSummary(role: UserRole = 'pemilik'): Promise<D
       unit_id: Number(r.unit_id),
       unit_info: `${r.unit_tipe || ''} ${r.unit_storage || ''} ${r.unit_warna || ''}`.trim(),
       unit_imei: String(r.unit_imei || ''),
+      unit_imei2: r.unit_imei2 ? String(r.unit_imei2) : undefined,
       kontak_id: r.kontak_id ? Number(r.kontak_id) : null,
       pembeli_nama: r.pembeli_nama ? String(r.pembeli_nama) : 'Pelanggan Umum',
       pembeli_telepon: r.pembeli_telepon ? String(r.pembeli_telepon) : null,
@@ -321,6 +322,7 @@ function sanitizeUnit(row: any, role: UserRole): Unit {
     storage: String(row.storage),
     warna: String(row.warna),
     imei: String(row.imei),
+    imei2: row.imei2 ? String(row.imei2) : null,
     battery_health: row.battery_health !== null ? Number(row.battery_health) : null,
     kondisi: row.kondisi ? String(row.kondisi) : null,
     kelengkapan: row.kelengkapan ? String(row.kelengkapan) : null,
@@ -366,8 +368,8 @@ export async function getUnits(params: {
 
   if (params.search && params.search.trim() !== '') {
     const q = `%${params.search.trim()}%`;
-    query += ' AND (imei LIKE ? OR tipe LIKE ? OR merk LIKE ? OR warna LIKE ?)';
-    args.push(q, q, q, q);
+    query += ' AND (imei LIKE ? OR imei2 LIKE ? OR tipe LIKE ? OR merk LIKE ? OR warna LIKE ?)';
+    args.push(q, q, q, q, q);
   }
 
   query += ' ORDER BY id DESC';
@@ -481,6 +483,7 @@ export async function createPurchase(data: {
   storage: string;
   warna: string;
   imei: string;
+  imei2?: string;
   battery_health?: number;
   kondisi?: string;
   kelengkapan?: string;
@@ -503,13 +506,31 @@ export async function createPurchase(data: {
   const db = await ensureDb();
 
   // Validate IMEI uniqueness (INV-01)
-  const existingImei = await db.execute({
-    sql: 'SELECT id, tipe, status FROM unit WHERE imei = ?',
-    args: [data.imei.trim()],
+  const imei1Clean = data.imei.trim();
+  const imei2Clean = data.imei2 && data.imei2.trim() !== '' ? data.imei2.trim() : null;
+
+  if (imei2Clean && imei1Clean === imei2Clean) {
+    throw new Error('IMEI 1 dan IMEI 2 tidak boleh sama!');
+  }
+
+  const existingImei1 = await db.execute({
+    sql: 'SELECT id, tipe, status FROM unit WHERE imei = ? OR imei2 = ?',
+    args: [imei1Clean, imei1Clean],
   });
 
-  if (existingImei.rows.length > 0) {
-    throw new Error(`IMEI ${data.imei} sudah pernah terdaftar di sistem! (Unit #${existingImei.rows[0].id} - ${existingImei.rows[0].tipe})`);
+  if (existingImei1.rows.length > 0) {
+    throw new Error(`IMEI 1 (${imei1Clean}) sudah pernah terdaftar di sistem! (Unit #${existingImei1.rows[0].id} - ${existingImei1.rows[0].tipe})`);
+  }
+
+  if (imei2Clean) {
+    const existingImei2 = await db.execute({
+      sql: 'SELECT id, tipe, status FROM unit WHERE imei = ? OR imei2 = ?',
+      args: [imei2Clean, imei2Clean],
+    });
+
+    if (existingImei2.rows.length > 0) {
+      throw new Error(`IMEI 2 (${imei2Clean}) sudah pernah terdaftar di sistem! (Unit #${existingImei2.rows[0].id} - ${existingImei2.rows[0].tipe})`);
+    }
   }
 
   // Handle contact
@@ -535,7 +556,7 @@ export async function createPurchase(data: {
 
   const unitRes = await db.execute({
     sql: `INSERT INTO unit (
-      merk, tipe, storage, warna, imei, battery_health, kondisi, kelengkapan,
+      merk, tipe, storage, warna, imei, imei2, battery_health, kondisi, kelengkapan,
       status, status_imei, catatan_imei, harga_beli, total_biaya_servis, hpp,
       harga_jual_rekomendasi, tanggal_masuk, foto, catatan
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
@@ -544,7 +565,8 @@ export async function createPurchase(data: {
       data.tipe,
       data.storage,
       data.warna,
-      data.imei.trim(),
+      imei1Clean,
+      imei2Clean,
       data.battery_health || null,
       data.kondisi || 'Mulus standar',
       data.kelengkapan || 'Unit batangan',
@@ -784,7 +806,7 @@ Kasir   : EpicPhone Team
 
 *Detail Pesanan:*
 📱 Unit  : ${unit.tipe} ${unit.storage} ${unit.warna}
-🔍 IMEI  : ${unit.imei}
+🔍 IMEI 1 : ${unit.imei}${unit.imei2 ? `\n🔍 IMEI 2 : ${unit.imei2}` : ''}
 🔋 B.H   : ${unit.battery_health ? `${unit.battery_health}%` : '-'}
 ---------------------------------------
 Harga    : ${rupiah(data.harga_jual)}

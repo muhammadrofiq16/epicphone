@@ -25,6 +25,7 @@ export interface Unit {
   storage: string;
   warna: string;
   imei: string;
+  imei2?: string | null;
   battery_health?: number | null;
   kondisi?: string | null;
   kelengkapan?: string | null;
@@ -64,6 +65,7 @@ export interface Purchase {
   unit_id: number;
   unit_tipe?: string;
   unit_imei?: string;
+  unit_imei2?: string;
   harga_beli: number;
   metode_bayar: PaymentMethod;
   status_bayar: PaymentStatus;
@@ -94,6 +96,7 @@ export interface Sale {
   unit_id: number;
   unit_info?: string;
   unit_imei?: string;
+  unit_imei2?: string;
   kontak_id?: number | null;
   pembeli_nama?: string | null;
   pembeli_telepon?: string | null;

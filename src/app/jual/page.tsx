@@ -256,7 +256,7 @@ function JualContent() {
                           {u.tipe} {u.storage}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">
-                          {u.warna} · IMEI: {u.imei}
+                          {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}
                         </div>
                       </div>
                       <div className="text-right">

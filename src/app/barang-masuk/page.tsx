@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   X,
@@ -15,9 +16,15 @@ import {
   Cloud,
   HardDrive,
   Sparkles,
+  ScanBarcode,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { PaymentMethod } from '@/types';
+
+const BarcodeScannerModal = dynamic(
+  () => import('@/components/common/BarcodeScannerModal').then((mod) => mod.BarcodeScannerModal),
+  { ssr: false }
+);
 
 const PRODUCT_CATALOG = [
   {
@@ -116,6 +123,11 @@ function BarangMasukContent() {
   const [varian, setVarian] = useState('128 GB');
   const [warna, setWarna] = useState('Midnight');
   const [imei, setImei] = useState('');
+  const [imei2, setImei2] = useState('');
+  const [scannerModal, setScannerModal] = useState<{ open: boolean; target: 'imei' | 'imei2' }>({
+    open: false,
+    target: 'imei',
+  });
 
   // Kondisi & Grade
   const [kondisiTipe, setKondisiTipe] = useState<'Bekas' | 'Baru'>('Bekas');
@@ -261,11 +273,22 @@ function BarangMasukContent() {
     if (itemType === 'hp') {
       const cleanImei = imei.replace(/\D/g, '');
       if (!cleanImei) {
-        setErrorMsg('Nomor IMEI wajib diisi untuk HP!');
+        setErrorMsg('Nomor IMEI 1 wajib diisi untuk HP!');
         return;
       }
       if (cleanImei.length !== 15) {
-        setErrorMsg(`Nomor IMEI harus tepat 15 digit angka! (Saat ini: ${cleanImei.length} digit)`);
+        setErrorMsg(`Nomor IMEI 1 harus tepat 15 digit angka! (Saat ini: ${cleanImei.length} digit)`);
+        return;
+      }
+
+      const cleanImei2 = imei2.replace(/\D/g, '');
+      if (cleanImei2 && cleanImei2.length !== 15) {
+        setErrorMsg(`Nomor IMEI 2 harus tepat 15 digit angka atau dikosongkan! (Saat ini: ${cleanImei2.length} digit)`);
+        return;
+      }
+
+      if (cleanImei2 && cleanImei === cleanImei2) {
+        setErrorMsg('Nomor IMEI 1 dan IMEI 2 tidak boleh sama!');
         return;
       }
     }
@@ -284,6 +307,7 @@ function BarangMasukContent() {
           storage: varian,
           warna,
           imei: imei.trim() || `ACC-${Date.now()}`,
+          imei2: imei2.trim() || undefined,
           battery_health: batteryHealth ? Number(batteryHealth) : null,
           kondisi: `${kondisiTipe} · ${grade} (${catatanUnit || 'Standar'})`,
           kelengkapan,
@@ -312,6 +336,7 @@ function BarangMasukContent() {
 
       if (stayOnPage) {
         setImei('');
+        setImei2('');
         setHargaBeli('');
         setCatatanUnit('');
         setPhotos([]);
@@ -468,56 +493,162 @@ function BarangMasukContent() {
             />
           </div>
 
-          {/* Warna & IMEI */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Warna */}
+          <div>
+            <label className="block text-slate-700 font-medium mb-1">
+              Warna <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={warna}
+              onChange={(e) => setWarna(e.target.value)}
+              placeholder="Contoh: Midnight"
+              required
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs"
+            />
+          </div>
+
+          {/* Section: Nomor IMEI (Dual SIM / eSIM) */}
+          {itemType === 'hp' ? (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <ScanBarcode size={15} className="text-blue-600" />
+                  Nomor IMEI (Dual SIM / eSIM)
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  Scan kamera atau input manual
+                </span>
+              </div>
+
+              {/* IMEI 1 (Wajib) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium text-[11px]">
+                    IMEI 1 (SIM Utama) <span className="text-rose-500">*</span>
+                  </label>
+                  <span
+                    className={`text-[10px] font-mono font-medium ${
+                      imei.length === 15
+                        ? 'text-emerald-600 font-bold'
+                        : imei.length > 0
+                        ? 'text-amber-600'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {imei.length}/15 digit
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={15}
+                      value={imei}
+                      onChange={(e) => {
+                        const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 15);
+                        setImei(numericOnly);
+                      }}
+                      placeholder="Contoh: 356891102938475"
+                      required
+                      className={`w-full font-mono font-semibold px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs transition-colors ${
+                        imei.length === 15
+                          ? 'border-emerald-500/80 ring-1 ring-emerald-500/20'
+                          : 'border-slate-200 dark:border-slate-700 focus:border-slate-400'
+                      }`}
+                    />
+                    {imei.length === 15 && (
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600">
+                        <CheckCircle2 size={14} />
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setScannerModal({ open: true, target: 'imei' })}
+                    className="px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 active:bg-blue-200 border border-blue-200 dark:border-blue-800 rounded-xl font-medium text-xs flex items-center gap-1.5 transition shrink-0 shadow-2xs"
+                    title="Scan barcode IMEI 1 dari dus atau layar *#06#"
+                  >
+                    <ScanBarcode size={15} />
+                    <span className="hidden sm:inline">Scan IMEI 1</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* IMEI 2 (Opsional) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium text-[11px]">
+                    IMEI 2 (SIM 2 / eSIM) <span className="text-slate-400 font-normal">(Opsional)</span>
+                  </label>
+                  <span
+                    className={`text-[10px] font-mono font-medium ${
+                      imei2.length === 15
+                        ? 'text-emerald-600 font-bold'
+                        : imei2.length > 0
+                        ? 'text-amber-600'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {imei2.length > 0 ? `${imei2.length}/15 digit` : 'Kosongkan jika Single SIM'}
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={15}
+                      value={imei2}
+                      onChange={(e) => {
+                        const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 15);
+                        setImei2(numericOnly);
+                      }}
+                      placeholder="Kosongkan jika HP Single SIM"
+                      className={`w-full font-mono font-semibold px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs transition-colors ${
+                        imei2.length === 15
+                          ? 'border-emerald-500/80 ring-1 ring-emerald-500/20'
+                          : 'border-slate-200 dark:border-slate-700 focus:border-slate-400'
+                      }`}
+                    />
+                    {imei2.length === 15 && (
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-600">
+                        <CheckCircle2 size={14} />
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setScannerModal({ open: true, target: 'imei2' })}
+                    className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 active:bg-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-xs flex items-center gap-1.5 transition shrink-0 shadow-2xs"
+                    title="Scan barcode IMEI 2 dari dus atau layar *#06#"
+                  >
+                    <ScanBarcode size={15} />
+                    <span className="hidden sm:inline">Scan IMEI 2</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Diisi jika unit mendukung Dual SIM fisik atau nano-SIM + eSIM (iPhone/Android Dual SIM).
+                </p>
+              </div>
+            </div>
+          ) : (
             <div>
-              <label className="block text-slate-700 font-medium mb-1">Warna</label>
+              <label className="block text-slate-700 font-medium mb-1">
+                Kode / Seri Aksesoris (Opsional)
+              </label>
               <input
                 type="text"
-                value={warna}
-                onChange={(e) => setWarna(e.target.value)}
-                placeholder="Contoh: Midnight"
+                value={imei}
+                onChange={(e) => setImei(e.target.value)}
+                placeholder="Contoh: ACC-001 atau barcode aksesoris"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs"
               />
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-slate-700 font-medium">
-                  IMEI (15 digit) <span className="text-rose-500">*</span>
-                </label>
-                <span
-                  className={`text-[10px] font-mono font-medium ${
-                    imei.length === 15
-                      ? 'text-emerald-600 font-bold'
-                      : imei.length > 0
-                      ? 'text-amber-600'
-                      : 'text-slate-400'
-                  }`}
-                >
-                  {imei.length}/15 digit
-                </span>
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={15}
-                value={imei}
-                onChange={(e) => {
-                  const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 15);
-                  setImei(numericOnly);
-                }}
-                placeholder="Contoh: 356891102938475"
-                required
-                className={`w-full font-mono font-semibold px-3 py-2 rounded-xl border bg-white text-slate-900 text-xs transition-colors ${
-                  imei.length === 15
-                    ? 'border-emerald-500/80 ring-1 ring-emerald-500/20'
-                    : 'border-slate-200 focus:border-slate-400'
-                }`}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* SECTION: KONDISI & GRADE */}
@@ -951,6 +1082,25 @@ function BarangMasukContent() {
         </div>
       </div>
     </div>
+
+    {/* Modal Barcode Scanner */}
+    <BarcodeScannerModal
+      isOpen={scannerModal.open}
+      onClose={() => setScannerModal((prev) => ({ ...prev, open: false }))}
+      onDetected={(scannedValue) => {
+        if (scannerModal.target === 'imei') {
+          setImei(scannedValue);
+        } else {
+          setImei2(scannedValue);
+        }
+      }}
+      title={
+        scannerModal.target === 'imei'
+          ? 'Scan Barcode IMEI 1 (SIM Utama)'
+          : 'Scan Barcode IMEI 2 (SIM 2 / eSIM)'
+      }
+      subtitle="Arahkan kamera ke barcode dus HP atau layar *#06#"
+    />
   </div>
 );
 }

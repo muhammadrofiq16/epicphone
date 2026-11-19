@@ -49,7 +49,8 @@ function RiwayatContent() {
       s.nomor_nota.toLowerCase().includes(q) ||
       (s.pembeli_nama && s.pembeli_nama.toLowerCase().includes(q)) ||
       (s.unit_info && s.unit_info.toLowerCase().includes(q)) ||
-      (s.unit_imei && s.unit_imei.includes(q))
+      (s.unit_imei && s.unit_imei.includes(q)) ||
+      (s.unit_imei2 && s.unit_imei2.includes(q))
     );
   });
 
@@ -164,9 +165,15 @@ function RiwayatContent() {
                 <span className="font-semibold text-slate-900">{selectedSale.unit_info}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">IMEI:</span>
+                <span className="text-slate-400">IMEI 1:</span>
                 <span className="font-mono text-slate-700">{selectedSale.unit_imei || '-'}</span>
               </div>
+              {selectedSale.unit_imei2 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">IMEI 2:</span>
+                  <span className="font-mono text-slate-700">{selectedSale.unit_imei2}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-400">Pembeli:</span>
                 <span className="text-slate-800">{selectedSale.pembeli_nama}</span>

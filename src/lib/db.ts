@@ -68,6 +68,7 @@ export async function initDb() {
       storage TEXT NOT NULL,
       warna TEXT NOT NULL,
       imei TEXT UNIQUE NOT NULL,
+      imei2 TEXT,
       battery_health INTEGER,
       kondisi TEXT,
       kelengkapan TEXT,
@@ -189,6 +190,17 @@ export async function initDb() {
       keterangan TEXT
     );
   `);
+
+  // Migration: Ensure imei2 column exists in unit table
+  try {
+    const unitCols = await db.execute("PRAGMA table_info(unit)");
+    const hasImei2 = unitCols.rows.some((r: any) => r.name === 'imei2');
+    if (!hasImei2) {
+      await db.execute("ALTER TABLE unit ADD COLUMN imei2 TEXT");
+    }
+  } catch (migErr) {
+    console.error("Migration error (unit.imei2):", migErr);
+  }
 
   // Check if initial users exist
   const usersCountRes = await db.execute('SELECT COUNT(*) as cnt FROM pengguna');

@@ -122,7 +122,8 @@ function StokContent() {
 Spesifikasi & Kondisi Unit:
 ✨ Kondisi: ${unit.kondisi || 'Mulus terawat'}
 🔋 Battery Health: ${unit.battery_health ? unit.battery_health + '%' : 'Normal'}
-📶 Sinyal/IMEI: ${unit.status_imei === 'aman' ? 'Garansi IMEI Aman Selamanya' : 'Status IMEI Terdaftar'}
+📶 Sinyal: ${unit.status_imei === 'aman' ? 'Garansi IMEI Aman Selamanya' : 'Status IMEI Terdaftar'}
+🔍 IMEI 1: ${unit.imei}${unit.imei2 ? `\n🔍 IMEI 2: ${unit.imei2}` : ''}
 📦 Kelengkapan: ${unit.kelengkapan || 'Fullset'}
 🔒 Akun: Bebas Reset / iCloud Aman Clean
 
@@ -385,7 +386,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                       {u.tipe} {u.storage}
                     </h3>
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                      {u.warna} · IMEI: {u.imei}
+                      {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}
                     </div>
                   </div>
 
@@ -478,7 +479,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                         {u.tipe} {u.storage}
                       </h3>
                       <div className="text-[10px] text-slate-400 dark:text-slate-400 mt-0.5 font-mono truncate">
-                        {u.warna} · IMEI: {u.imei}
+                        {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}
                       </div>
                     </div>
 
@@ -564,7 +565,8 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                       {unitDetail.unit.tipe} {unitDetail.unit.storage}
                     </h2>
                     <p className="text-[11px] text-slate-400">
-                      {unitDetail.unit.warna} · IMEI: {unitDetail.unit.imei}
+                      {unitDetail.unit.warna} · IMEI 1: {unitDetail.unit.imei}
+                      {unitDetail.unit.imei2 ? ` · IMEI 2: ${unitDetail.unit.imei2}` : ''}
                     </p>
                   </div>
                   <button
@@ -698,6 +700,20 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
 
                 {/* Specs */}
                 <div className="p-3 bg-white dark:bg-[#142036] border border-slate-200/70 dark:border-slate-800 rounded-2xl space-y-1.5 text-[11px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">IMEI 1 (SIM Utama):</span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                      {unitDetail.unit.imei}
+                    </span>
+                  </div>
+                  {unitDetail.unit.imei2 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400">IMEI 2 (SIM 2 / eSIM):</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {unitDetail.unit.imei2}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-slate-400">Battery Health:</span>
                     <span className="font-medium text-slate-800 dark:text-slate-200">
