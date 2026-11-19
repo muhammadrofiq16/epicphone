@@ -499,6 +499,72 @@ export async function updateUnitStatus(
   return { success: true, oldStatus, newStatus };
 }
 
+export async function deleteUnit(unitId: number, userId: number = 1) {
+  const db = await ensureDb();
+
+  // 1. Check unit exists
+  const unitRes = await db.execute({
+    sql: 'SELECT * FROM unit WHERE id = ?',
+    args: [unitId],
+  });
+
+  if (unitRes.rows.length === 0) {
+    throw new Error('Unit tidak ditemukan');
+  }
+
+  const unit = unitRes.rows[0];
+
+  // 2. Prevent deleting sold units
+  if (unit.status === 'Terjual') {
+    throw new Error('Unit yang sudah terjual tidak dapat dihapus. Batalkan penjualan terlebih dahulu jika diperlukan.');
+  }
+
+  // 3. Find and delete associated purchase payments and purchases
+  const purchaseRes = await db.execute({
+    sql: 'SELECT id FROM pembelian WHERE unit_id = ?',
+    args: [unitId],
+  });
+
+  for (const p of purchaseRes.rows) {
+    const pId = Number(p.id);
+    await db.execute({
+      sql: 'DELETE FROM pembayaran WHERE jenis = ? AND referensi_id = ?',
+      args: ['pembelian', pId],
+    });
+  }
+
+  await db.execute({
+    sql: 'DELETE FROM pembelian WHERE unit_id = ?',
+    args: [unitId],
+  });
+
+  // 4. Delete service logs for this unit
+  await db.execute({
+    sql: 'DELETE FROM servis WHERE unit_id = ?',
+    args: [unitId],
+  });
+
+  // 5. Delete the unit itself
+  await db.execute({
+    sql: 'DELETE FROM unit WHERE id = ?',
+    args: [unitId],
+  });
+
+  // 6. Log deletion
+  await db.execute({
+    sql: `INSERT INTO log_perubahan (pengguna_id, tabel, record_id, aksi, nilai_lama, nilai_baru, keterangan)
+          VALUES (?, 'unit', ?, 'DELETE_UNIT', ?, NULL, ?)`,
+    args: [
+      userId,
+      unitId,
+      JSON.stringify({ tipe: unit.tipe, imei: unit.imei, harga_beli: unit.harga_beli }),
+      `Unit #${unitId} (${unit.tipe} - IMEI: ${unit.imei}) dihapus dari stok`,
+    ],
+  });
+
+  return { success: true, deletedUnitId: unitId, message: `Unit #${unitId} (${unit.tipe}) berhasil dihapus.` };
+}
+
 // ----------------- BARANG MASUK (PURCHASES) -----------------
 export async function createPurchase(data: {
   merk?: string;

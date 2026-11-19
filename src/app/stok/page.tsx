@@ -25,6 +25,8 @@ import {
   Download,
   LayoutGrid,
   List,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -109,6 +111,9 @@ function StokContent() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedDetailPhotoIndex, setSelectedDetailPhotoIndex] = useState(0);
   const [selectedSinyalFilter, setSelectedSinyalFilter] = useState<string>('semua');
+  const [confirmDeleteUnit, setConfirmDeleteUnit] = useState<Unit | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const isOwner = role === 'pemilik';
 
@@ -284,6 +289,28 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
       }
     } catch (err) {
       console.error('Error updating status:', err);
+    }
+  };
+
+  const handleDeleteUnit = async () => {
+    if (!confirmDeleteUnit) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError('');
+      const res = await fetch(`/api/units/${confirmDeleteUnit.id}?userId=${currentUser?.id || 1}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal menghapus unit');
+      }
+      setConfirmDeleteUnit(null);
+      closeUnitDetail();
+      fetchUnits();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Terjadi kesalahan saat menghapus');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -922,7 +949,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                 </button>
 
                 {/* CTA */}
-                <div className="pt-1">
+                <div className="pt-1 space-y-1.5">
                   {unitDetail.unit.status === 'Siap jual' ? (
                     <Link
                       href={`/jual?unit_id=${unitDetail.unit.id}`}
@@ -937,6 +964,17 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                       className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs"
                     >
                       Tutup
+                    </button>
+                  )}
+
+                  {unitDetail.unit.status !== 'Terjual' && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteUnit(unitDetail.unit)}
+                      className="w-full py-2 px-3 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Produk / Salah Input</span>
                     </button>
                   )}
                 </div>
@@ -1159,6 +1197,116 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                 className="w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/90"
               >
                 <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS PRODUK */}
+      {confirmDeleteUnit && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          onClick={() => {
+            if (!isDeleting) {
+              setConfirmDeleteUnit(null);
+              setDeleteError('');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header / Warning Icon */}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-200 dark:border-rose-800/80 shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Hapus Unit dari Stok?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Data unit akan dihapus permanen dari sistem.
+                </p>
+              </div>
+            </div>
+
+            {/* Box Ringkasan Unit */}
+            <div className="bg-slate-50 dark:bg-[#142036] rounded-2xl p-3.5 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 dark:text-slate-400">Tipe Unit:</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {confirmDeleteUnit.tipe} {confirmDeleteUnit.storage}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 dark:text-slate-400">Warna / Kondisi:</span>
+                <span className="text-slate-800 dark:text-slate-200 font-medium">
+                  {confirmDeleteUnit.warna || '-'} · {confirmDeleteUnit.kondisi || '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center font-mono">
+                <span className="text-slate-500 dark:text-slate-400 font-sans">IMEI 1:</span>
+                <span className="text-slate-800 dark:text-slate-200">{confirmDeleteUnit.imei}</span>
+              </div>
+              {confirmDeleteUnit.imei2 && (
+                <div className="flex justify-between items-center font-mono">
+                  <span className="text-slate-500 dark:text-slate-400 font-sans">IMEI 2:</span>
+                  <span className="text-slate-800 dark:text-slate-200">{confirmDeleteUnit.imei2}</span>
+                </div>
+              )}
+              {isOwner && confirmDeleteUnit.harga_beli && (
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700/60">
+                  <span className="text-slate-500 dark:text-slate-400">Harga Beli / HPP:</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {formatMoney(confirmDeleteUnit.harga_beli)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+              ⚠️ <strong>Perhatian:</strong> Riwayat pembelian dan servis terkait unit ini akan ikut dibersihkan. Gunakan opsi ini jika salah memasukkan data barang atau foto.
+            </div>
+
+            {deleteError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setConfirmDeleteUnit(null);
+                  setDeleteError('');
+                }}
+                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteUnit}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Ya, Hapus Unit</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

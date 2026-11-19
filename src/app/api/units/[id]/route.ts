@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUnitById, updateUnitStatus } from '@/lib/services';
+import { getUnitById, updateUnitStatus, deleteUnit } from '@/lib/services';
 import { UserRole, UnitStatus } from '@/types';
 
 export async function GET(
@@ -38,5 +38,21 @@ export async function PATCH(
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating unit status' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const userId = Number(request.nextUrl.searchParams.get('userId') || 1);
+
+    const result = await deleteUnit(Number(id), userId);
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error('Delete unit error:', error);
+    return NextResponse.json({ error: error.message || 'Gagal menghapus unit' }, { status: 400 });
   }
 }
