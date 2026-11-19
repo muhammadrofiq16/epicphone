@@ -252,8 +252,23 @@ function JualContent() {
                       }`}
                     >
                       <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-xs">
-                          {u.tipe} {u.storage}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 dark:text-white text-xs">
+                            {u.tipe} {u.storage}
+                          </span>
+                          {u.jenis_garansi === 'resmi' ? (
+                            <span className="text-[9px] font-semibold px-1 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              Resmi
+                            </span>
+                          ) : u.status_sinyal === 'wifi_only' ? (
+                            <span className="text-[9px] font-bold px-1 rounded bg-slate-800 text-white">
+                              WiFi Only
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-semibold px-1 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                              Inter All Opr
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">
                           {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}

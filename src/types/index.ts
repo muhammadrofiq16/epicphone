@@ -17,6 +17,9 @@ export type UnitStatus =
   | 'Retur';
 
 export type ImeiStatus = 'aman' | 'bermasalah';
+export type GaransiType = 'resmi' | 'inter';
+export type SinyalStatus = 'all_operator' | 'smartfren_only' | 'wifi_only';
+export type SimLockStatus = 'fu' | 'su';
 
 export interface Unit {
   id: number;
@@ -32,6 +35,10 @@ export interface Unit {
   status: UnitStatus;
   status_imei: ImeiStatus;
   catatan_imei?: string | null;
+  jenis_garansi?: GaransiType;
+  status_sinyal?: SinyalStatus;
+  status_sim_lock?: SimLockStatus;
+  garansi_sinyal?: string | null;
   harga_beli: number;
   total_biaya_servis: number;
   hpp: number; // harga_beli + total_biaya_servis
@@ -66,6 +73,10 @@ export interface Purchase {
   unit_tipe?: string;
   unit_imei?: string;
   unit_imei2?: string;
+  unit_jenis_garansi?: GaransiType;
+  unit_status_sinyal?: SinyalStatus;
+  unit_status_sim_lock?: SimLockStatus;
+  unit_garansi_sinyal?: string | null;
   harga_beli: number;
   metode_bayar: PaymentMethod;
   status_bayar: PaymentStatus;
@@ -97,6 +108,10 @@ export interface Sale {
   unit_info?: string;
   unit_imei?: string;
   unit_imei2?: string;
+  unit_jenis_garansi?: GaransiType;
+  unit_status_sinyal?: SinyalStatus;
+  unit_status_sim_lock?: SimLockStatus;
+  unit_garansi_sinyal?: string | null;
   kontak_id?: number | null;
   pembeli_nama?: string | null;
   pembeli_telepon?: string | null;

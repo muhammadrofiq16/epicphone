@@ -75,6 +75,10 @@ export async function initDb() {
       status TEXT NOT NULL CHECK(status IN ('Baru masuk', 'Dicek/Servis', 'Siap jual', 'Booking', 'Terjual', 'Retur')),
       status_imei TEXT NOT NULL DEFAULT 'aman' CHECK(status_imei IN ('aman', 'bermasalah')),
       catatan_imei TEXT,
+      jenis_garansi TEXT NOT NULL DEFAULT 'resmi',
+      status_sinyal TEXT NOT NULL DEFAULT 'all_operator',
+      status_sim_lock TEXT NOT NULL DEFAULT 'fu',
+      garansi_sinyal TEXT DEFAULT 'selamanya',
       harga_beli REAL NOT NULL DEFAULT 0,
       total_biaya_servis REAL NOT NULL DEFAULT 0,
       hpp REAL NOT NULL DEFAULT 0,
@@ -191,15 +195,28 @@ export async function initDb() {
     );
   `);
 
-  // Migration: Ensure imei2 column exists in unit table
+  // Migration: Ensure new columns exist in unit table
   try {
     const unitCols = await db.execute("PRAGMA table_info(unit)");
-    const hasImei2 = unitCols.rows.some((r: any) => r.name === 'imei2');
-    if (!hasImei2) {
+    const colNames = new Set(unitCols.rows.map((r: any) => r.name));
+
+    if (!colNames.has('imei2')) {
       await db.execute("ALTER TABLE unit ADD COLUMN imei2 TEXT");
     }
+    if (!colNames.has('jenis_garansi')) {
+      await db.execute("ALTER TABLE unit ADD COLUMN jenis_garansi TEXT NOT NULL DEFAULT 'resmi'");
+    }
+    if (!colNames.has('status_sinyal')) {
+      await db.execute("ALTER TABLE unit ADD COLUMN status_sinyal TEXT NOT NULL DEFAULT 'all_operator'");
+    }
+    if (!colNames.has('status_sim_lock')) {
+      await db.execute("ALTER TABLE unit ADD COLUMN status_sim_lock TEXT NOT NULL DEFAULT 'fu'");
+    }
+    if (!colNames.has('garansi_sinyal')) {
+      await db.execute("ALTER TABLE unit ADD COLUMN garansi_sinyal TEXT DEFAULT 'selamanya'");
+    }
   } catch (migErr) {
-    console.error("Migration error (unit.imei2):", migErr);
+    console.error("Migration error (unit table columns):", migErr);
   }
 
   // Check if initial users exist

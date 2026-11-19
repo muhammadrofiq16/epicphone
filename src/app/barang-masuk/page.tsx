@@ -17,9 +17,13 @@ import {
   HardDrive,
   Sparkles,
   ScanBarcode,
+  Globe,
+  ShieldCheck,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { PaymentMethod } from '@/types';
+import { PaymentMethod, GaransiType, SinyalStatus, SimLockStatus } from '@/types';
 
 const BarcodeScannerModal = dynamic(
   () => import('@/components/common/BarcodeScannerModal').then((mod) => mod.BarcodeScannerModal),
@@ -136,6 +140,12 @@ function BarangMasukContent() {
   const [bebasKunciAkun, setBebasKunciAkun] = useState('Ya, bebas');
   const [statusImei, setStatusImei] = useState<'aman' | 'bermasalah'>('aman');
   const [kelengkapan, setKelengkapan] = useState('Fullset');
+
+  // Garansi & Jaringan Sinyal (Resmi vs Inter)
+  const [jenisGaransi, setJenisGaransi] = useState<GaransiType>('resmi');
+  const [statusSinyal, setStatusSinyal] = useState<SinyalStatus>('all_operator');
+  const [statusSimLock, setStatusSimLock] = useState<SimLockStatus>('fu');
+  const [garansiSinyal, setGaransiSinyal] = useState<string>('selamanya');
 
   // Harga & Transaksi
   const [hargaBeli, setHargaBeli] = useState<string>('');
@@ -315,6 +325,10 @@ function BarangMasukContent() {
           harga_jual_rekomendasi: hargaTarget ? Number(hargaTarget.replace(/\D/g, '')) : null,
           status_imei: statusImei,
           catatan_imei: bebasKunciAkun === 'Ya, bebas' ? 'iCloud/Akun Aman Bebas Reset' : 'Akun Terkunci',
+          jenis_garansi: jenisGaransi,
+          status_sinyal: statusSinyal,
+          status_sim_lock: statusSimLock,
+          garansi_sinyal: garansiSinyal,
           sumber_jenis: asalBarang ? 'supplier' : 'penjual',
           kontak_nama: asalBarang || 'Supplier Toko',
           kontak_telepon: kontakTelepon || null,
@@ -340,6 +354,10 @@ function BarangMasukContent() {
         setHargaBeli('');
         setCatatanUnit('');
         setPhotos([]);
+        setJenisGaransi('resmi');
+        setStatusSinyal('all_operator');
+        setStatusSimLock('fu');
+        setGaransiSinyal('selamanya');
         setTimeout(() => setSuccessMsg(''), 3000);
       } else {
         setTimeout(() => router.push('/stok'), 1000);
@@ -785,6 +803,170 @@ function BarangMasukContent() {
               <option value="bermasalah">Bermasalah / Ditahan (Butuh Approval)</option>
             </select>
           </div>
+
+          {/* Asal Garansi & Jaringan Sinyal (Resmi vs Inter) */}
+          {itemType === 'hp' && (
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5 flex items-center justify-between text-xs">
+                  <span>Asal Unit & Garansi</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Resmi Indonesia vs Inter</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJenisGaransi('resmi');
+                      setStatusSinyal('all_operator');
+                      setStatusSimLock('fu');
+                      setGaransiSinyal('selamanya');
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all ${
+                      jenisGaransi === 'resmi'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-500 dark:text-emerald-300 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🇮🇩 Resmi Indonesia</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJenisGaransi('inter');
+                      if (garansiSinyal === 'selamanya') {
+                        setGaransiSinyal('3_bulan');
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all ${
+                      jenisGaransi === 'inter'
+                        ? 'bg-blue-50 border-blue-500 text-blue-900 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Globe size={14} />
+                    <span>🌐 Inter (Internasional)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-Pilihan jika Resmi */}
+              {jenisGaransi === 'resmi' ? (
+                <div className="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/60 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                  <span>
+                    Unit Resmi (iBox/Digimap/GDN) otomatis <strong>All Operator</strong>, <strong>Non SIM-Lock (FU)</strong>, & <strong>Garansi Sinyal Selamanya</strong>.
+                  </span>
+                </div>
+              ) : (
+                /* Sub-Pilihan jika Inter (Internasional) */
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-3">
+                  {/* Status Sinyal */}
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5 text-[11px]">
+                      Status Sinyal / Provider
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusSinyal('all_operator');
+                          if (garansiSinyal === 'tanpa_garansi') setGaransiSinyal('3_bulan');
+                        }}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                          statusSinyal === 'all_operator'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        All Operator
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusSinyal('smartfren_only');
+                          if (garansiSinyal === 'tanpa_garansi') setGaransiSinyal('3_bulan');
+                        }}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                          statusSinyal === 'smartfren_only'
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        Smartfren
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusSinyal('wifi_only');
+                          setGaransiSinyal('tanpa_garansi');
+                        }}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                          statusSinyal === 'wifi_only'
+                            ? 'bg-slate-800 dark:bg-slate-700 text-white border-slate-800 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        WiFi Only
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Status SIM Lock (FU vs SU) */}
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5 text-[11px]">
+                      Kunci Jaringan (SIM-Lock)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStatusSimLock('fu')}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
+                          statusSimLock === 'fu'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        <Unlock size={13} />
+                        <span>FU (Non SIM-Lock)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatusSimLock('su')}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
+                          statusSimLock === 'su'
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        <Lock size={13} />
+                        <span>SU (SIM-Lock / R-SIM)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Garansi Sinyal Toko */}
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1 text-[11px]">
+                      Garansi Sinyal Toko
+                    </label>
+                    <select
+                      value={garansiSinyal}
+                      onChange={(e) => setGaransiSinyal(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs"
+                    >
+                      <option value="tanpa_garansi">Tanpa Garansi Sinyal (Khusus WiFi Only)</option>
+                      <option value="1_bulan">Garansi Sinyal 1 Bulan</option>
+                      <option value="3_bulan">Garansi Sinyal 3 Bulan (Standar Inter)</option>
+                      <option value="6_bulan">Garansi Sinyal 6 Bulan</option>
+                      <option value="1_tahun">Garansi Sinyal 1 Tahun</option>
+                      <option value="selamanya">Garansi Sinyal Selamanya (Bea Cukai)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* SECTION: HARGA & TRANSAKSI */}

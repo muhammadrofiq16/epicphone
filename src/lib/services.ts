@@ -12,6 +12,9 @@ import {
   DashboardSummary,
   PaymentMethod,
   PaymentStatus,
+  GaransiType,
+  SinyalStatus,
+  SimLockStatus,
 } from '@/types';
 
 // Ensure DB is initialized
@@ -253,7 +256,7 @@ export async function getDashboardSummary(role: UserRole = 'pemilik'): Promise<D
 
   // Transaksi Terakhir (5)
   const recentSalesRes = await db.execute(`
-    SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, u.imei2 as unit_imei2, usr.nama as pencatat_nama
+    SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, u.imei2 as unit_imei2, u.jenis_garansi as unit_jenis_garansi, u.status_sinyal as unit_status_sinyal, u.status_sim_lock as unit_status_sim_lock, u.garansi_sinyal as unit_garansi_sinyal, usr.nama as pencatat_nama
     FROM penjualan p
     LEFT JOIN unit u ON p.unit_id = u.id
     LEFT JOIN pengguna usr ON p.pencatat_id = usr.id
@@ -270,6 +273,10 @@ export async function getDashboardSummary(role: UserRole = 'pemilik'): Promise<D
       unit_info: `${r.unit_tipe || ''} ${r.unit_storage || ''} ${r.unit_warna || ''}`.trim(),
       unit_imei: String(r.unit_imei || ''),
       unit_imei2: r.unit_imei2 ? String(r.unit_imei2) : undefined,
+      unit_jenis_garansi: r.unit_jenis_garansi as any,
+      unit_status_sinyal: r.unit_status_sinyal as any,
+      unit_status_sim_lock: r.unit_status_sim_lock as any,
+      unit_garansi_sinyal: r.unit_garansi_sinyal ? String(r.unit_garansi_sinyal) : undefined,
       kontak_id: r.kontak_id ? Number(r.kontak_id) : null,
       pembeli_nama: r.pembeli_nama ? String(r.pembeli_nama) : 'Pelanggan Umum',
       pembeli_telepon: r.pembeli_telepon ? String(r.pembeli_telepon) : null,
@@ -329,6 +336,10 @@ function sanitizeUnit(row: any, role: UserRole): Unit {
     status: row.status as UnitStatus,
     status_imei: row.status_imei as 'aman' | 'bermasalah',
     catatan_imei: row.catatan_imei ? String(row.catatan_imei) : null,
+    jenis_garansi: (row.jenis_garansi as any) || 'resmi',
+    status_sinyal: (row.status_sinyal as any) || 'all_operator',
+    status_sim_lock: (row.status_sim_lock as any) || 'fu',
+    garansi_sinyal: row.garansi_sinyal ? String(row.garansi_sinyal) : null,
     harga_beli: isOwner ? Number(row.harga_beli) : 0,
     total_biaya_servis: isOwner ? Number(row.total_biaya_servis) : 0,
     hpp: isOwner ? Number(row.hpp) : 0,
@@ -354,6 +365,8 @@ export async function getUnits(params: {
   status?: string;
   search?: string;
   role?: UserRole;
+  jenis_garansi?: string;
+  status_sinyal?: string;
 }): Promise<Unit[]> {
   const db = await ensureDb();
   const role = params.role || 'pemilik';
@@ -364,6 +377,16 @@ export async function getUnits(params: {
   if (params.status && params.status !== 'Semua') {
     query += ' AND status = ?';
     args.push(params.status);
+  }
+
+  if (params.jenis_garansi && params.jenis_garansi !== 'Semua' && params.jenis_garansi !== 'semua') {
+    query += ' AND jenis_garansi = ?';
+    args.push(params.jenis_garansi);
+  }
+
+  if (params.status_sinyal && params.status_sinyal !== 'Semua' && params.status_sinyal !== 'semua') {
+    query += ' AND status_sinyal = ?';
+    args.push(params.status_sinyal);
   }
 
   if (params.search && params.search.trim() !== '') {
@@ -491,6 +514,10 @@ export async function createPurchase(data: {
   harga_jual_rekomendasi?: number;
   status_imei: 'aman' | 'bermasalah';
   catatan_imei?: string;
+  jenis_garansi?: GaransiType;
+  status_sinyal?: SinyalStatus;
+  status_sim_lock?: SimLockStatus;
+  garansi_sinyal?: string;
   sumber_jenis: 'supplier' | 'penjual';
   kontak_nama?: string;
   kontak_telepon?: string;
@@ -557,9 +584,10 @@ export async function createPurchase(data: {
   const unitRes = await db.execute({
     sql: `INSERT INTO unit (
       merk, tipe, storage, warna, imei, imei2, battery_health, kondisi, kelengkapan,
-      status, status_imei, catatan_imei, harga_beli, total_biaya_servis, hpp,
+      status, status_imei, catatan_imei, jenis_garansi, status_sinyal, status_sim_lock, garansi_sinyal,
+      harga_beli, total_biaya_servis, hpp,
       harga_jual_rekomendasi, tanggal_masuk, foto, catatan
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     args: [
       data.merk || 'Apple',
       data.tipe,
@@ -573,6 +601,10 @@ export async function createPurchase(data: {
       unitStatus,
       data.status_imei,
       data.catatan_imei || null,
+      data.jenis_garansi || 'resmi',
+      data.status_sinyal || 'all_operator',
+      data.status_sim_lock || 'fu',
+      data.garansi_sinyal || (data.jenis_garansi === 'inter' ? '3_bulan' : 'selamanya'),
       data.harga_beli,
       hpp,
       data.harga_jual_rekomendasi || null,
@@ -798,6 +830,21 @@ export async function createSale(data: {
   const rupiah = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
+  const sinyalLine = (() => {
+    if (unit.jenis_garansi === 'resmi') {
+      return 'Resmi Indonesia (Garansi Sinyal Selamanya)';
+    }
+    if (unit.status_sinyal === 'wifi_only') {
+      return 'WiFi Only / No SIM (Khusus Koneksi WiFi)';
+    }
+    if (unit.status_sinyal === 'smartfren_only') {
+      return 'Smartfren Only';
+    }
+    const simLockText = unit.status_sim_lock === 'su' ? 'SU (R-SIM)' : 'FU (Non SIM-Lock)';
+    const garansiStr = unit.garansi_sinyal ? String(unit.garansi_sinyal).replace('_', ' ') : '3 bulan';
+    return `Inter All Operator (${simLockText} · Garansi Sinyal: ${garansiStr})`;
+  })();
+
   const waText = `🧾 *NOTA RESMI ${settings.nama_toko.toUpperCase()}*
 ---------------------------------------
 No. Nota: ${nomorNota}
@@ -805,9 +852,10 @@ Tanggal : ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
 Kasir   : EpicPhone Team
 
 *Detail Pesanan:*
-📱 Unit  : ${unit.tipe} ${unit.storage} ${unit.warna}
-🔍 IMEI 1 : ${unit.imei}${unit.imei2 ? `\n🔍 IMEI 2 : ${unit.imei2}` : ''}
-🔋 B.H   : ${unit.battery_health ? `${unit.battery_health}%` : '-'}
+📱 Unit    : ${unit.tipe} ${unit.storage} ${unit.warna}
+📶 Jaringan: ${sinyalLine}
+🔍 IMEI 1  : ${unit.imei}${unit.imei2 ? `\n🔍 IMEI 2  : ${unit.imei2}` : ''}
+🔋 B.H     : ${unit.battery_health ? `${unit.battery_health}%` : '-'}
 ---------------------------------------
 Harga    : ${rupiah(data.harga_jual)}
 ${diskon > 0 ? `Diskon   : -${rupiah(diskon)}\n` : ''}${tradeInPotongan > 0 ? `Tukar Tambah : -${rupiah(tradeInPotongan)}\n` : ''}*TOTAL DIBAYAR: ${rupiah(uangDiterima)}*

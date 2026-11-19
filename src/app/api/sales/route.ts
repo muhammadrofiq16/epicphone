@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const role = (request.nextUrl.searchParams.get('role') as UserRole) || 'pemilik';
 
     const res = await db.execute(`
-      SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, u.imei2 as unit_imei2, usr.nama as pencatat_nama
+      SELECT p.*, u.tipe as unit_tipe, u.storage as unit_storage, u.warna as unit_warna, u.imei as unit_imei, u.imei2 as unit_imei2, u.jenis_garansi as unit_jenis_garansi, u.status_sinyal as unit_status_sinyal, u.status_sim_lock as unit_status_sim_lock, u.garansi_sinyal as unit_garansi_sinyal, usr.nama as pencatat_nama
       FROM penjualan p
       LEFT JOIN unit u ON p.unit_id = u.id
       LEFT JOIN pengguna usr ON p.pencatat_id = usr.id
@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
       unit_info: `${r.unit_tipe || ''} ${r.unit_storage || ''} ${r.unit_warna || ''}`.trim(),
       unit_imei: String(r.unit_imei || ''),
       unit_imei2: r.unit_imei2 ? String(r.unit_imei2) : undefined,
+      unit_jenis_garansi: r.unit_jenis_garansi as any,
+      unit_status_sinyal: r.unit_status_sinyal as any,
+      unit_status_sim_lock: r.unit_status_sim_lock as any,
+      unit_garansi_sinyal: r.unit_garansi_sinyal ? String(r.unit_garansi_sinyal) : undefined,
       kontak_id: r.kontak_id ? Number(r.kontak_id) : null,
       pembeli_nama: r.pembeli_nama ? String(r.pembeli_nama) : 'Pelanggan Umum',
       pembeli_telepon: r.pembeli_telepon ? String(r.pembeli_telepon) : null,

@@ -174,6 +174,18 @@ function RiwayatContent() {
                   <span className="font-mono text-slate-700">{selectedSale.unit_imei2}</span>
                 </div>
               )}
+              {selectedSale.unit_status_sinyal && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Jaringan:</span>
+                  <span className="font-medium text-slate-800">
+                    {selectedSale.unit_jenis_garansi === 'resmi'
+                      ? 'Resmi Indonesia'
+                      : selectedSale.unit_status_sinyal === 'wifi_only'
+                      ? 'WiFi Only'
+                      : 'Inter All Operator'}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-400">Pembeli:</span>
                 <span className="text-slate-800">{selectedSale.pembeli_nama}</span>

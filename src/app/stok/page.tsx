@@ -108,8 +108,41 @@ function StokContent() {
   const [selectedPhotoFormat, setSelectedPhotoFormat] = useState<'watermarked' | 'square' | 'original'>('watermarked');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedDetailPhotoIndex, setSelectedDetailPhotoIndex] = useState(0);
+  const [selectedSinyalFilter, setSelectedSinyalFilter] = useState<string>('semua');
 
   const isOwner = role === 'pemilik';
+
+  const getSinyalBadge = (unit: Unit) => {
+    if (unit.jenis_garansi === 'resmi') {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+          🇮🇩 Resmi iBox
+        </span>
+      );
+    }
+    if (unit.status_sinyal === 'wifi_only') {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-100 dark:bg-slate-700 border border-slate-600">
+          📶 WiFi Only
+        </span>
+      );
+    }
+    if (unit.status_sinyal === 'smartfren_only') {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+          Smartfren Only
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+        🌐 Inter All Opr
+        {unit.status_sim_lock === 'su' && (
+          <span className="text-[8px] bg-purple-600 text-white px-1 rounded">SU/R-SIM</span>
+        )}
+      </span>
+    );
+  };
 
   const generatePromoCaption = (unit: any) => {
     if (!unit) return '';
@@ -117,12 +150,27 @@ function StokContent() {
       ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(unit.harga_jual_rekomendasi)
       : 'Hubungi Admin';
 
+    const sinyalPromo = (() => {
+      if (unit.jenis_garansi === 'resmi') {
+        return '🇮🇩 Resmi Indonesia (iBox/Digimap) - Garansi Sinyal Selamanya & Bebas Blokir!';
+      }
+      if (unit.status_sinyal === 'wifi_only') {
+        return '📶 WiFi Only / No SIM (Khusus koneksi WiFi, kamera & performa 100% normal - Harga Lebih Hemat!)';
+      }
+      if (unit.status_sinyal === 'smartfren_only') {
+        return '📶 Smartfren Only (Khusus kartu provider Smartfren)';
+      }
+      const simStatus = unit.status_sim_lock === 'su' ? 'SU (SIM-Lock / R-SIM)' : 'FU (Non SIM-Lock / Bebas Kartu)';
+      const garansiStr = unit.garansi_sinyal ? String(unit.garansi_sinyal).replace('_', ' ') : '3 Bulan';
+      return `🌐 Inter All Operator (${simStatus}) - Garansi Sinyal Toko: ${garansiStr}`;
+    })();
+
     return `🔥 READY STOCK: ${unit.tipe} ${unit.storage} ${unit.warna}
 
 Spesifikasi & Kondisi Unit:
 ✨ Kondisi: ${unit.kondisi || 'Mulus terawat'}
 🔋 Battery Health: ${unit.battery_health ? unit.battery_health + '%' : 'Normal'}
-📶 Sinyal: ${unit.status_imei === 'aman' ? 'Garansi IMEI Aman Selamanya' : 'Status IMEI Terdaftar'}
+📶 Sinyal: ${sinyalPromo}
 🔍 IMEI 1: ${unit.imei}${unit.imei2 ? `\n🔍 IMEI 2: ${unit.imei2}` : ''}
 📦 Kelengkapan: ${unit.kelengkapan || 'Fullset'}
 🔒 Akun: Bebas Reset / iCloud Aman Clean
@@ -162,6 +210,16 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
       const params = new URLSearchParams();
       if (selectedStatus !== 'Semua') params.append('status', selectedStatus);
       if (search.trim()) params.append('search', search.trim());
+      if (selectedSinyalFilter === 'resmi') {
+        params.append('jenis_garansi', 'resmi');
+      } else if (selectedSinyalFilter === 'all_operator') {
+        params.append('jenis_garansi', 'inter');
+        params.append('status_sinyal', 'all_operator');
+      } else if (selectedSinyalFilter === 'smartfren_only') {
+        params.append('status_sinyal', 'smartfren_only');
+      } else if (selectedSinyalFilter === 'wifi_only') {
+        params.append('status_sinyal', 'wifi_only');
+      }
       params.append('role', role);
 
       const res = await fetch(`/api/units?${params.toString()}`);
@@ -178,7 +236,7 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
 
   useEffect(() => {
     fetchUnits();
-  }, [selectedStatus, role]);
+  }, [selectedStatus, selectedSinyalFilter, role]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,6 +374,34 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
         </div>
       </div>
 
+      {/* Sinyal Filter Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar text-[10px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <span className="text-slate-400 dark:text-slate-500 shrink-0 font-medium mr-0.5">Sinyal:</span>
+        {[
+          { id: 'semua', label: 'Semua' },
+          { id: 'resmi', label: '🇮🇩 Resmi iBox' },
+          { id: 'all_operator', label: '🌐 Inter All Opr' },
+          { id: 'smartfren_only', label: '📶 Smartfren Only' },
+          { id: 'wifi_only', label: '📶 WiFi Only' },
+        ].map((f) => {
+          const isActive = selectedSinyalFilter === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSelectedSinyalFilter(f.id)}
+              className={`px-2 py-0.5 rounded-md whitespace-nowrap transition-all ${
+                isActive
+                  ? 'bg-blue-600 text-white font-semibold shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Units List */}
       {loading ? (
         <div className="text-center py-12 text-slate-400 text-xs">Memuat unit...</div>
@@ -382,9 +468,12 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                 {/* Content Details */}
                 <div className="p-3 flex-1 flex flex-col justify-between space-y-1.5">
                   <div>
-                    <h3 className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate">
-                      {u.tipe} {u.storage}
-                    </h3>
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <h3 className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate">
+                        {u.tipe} {u.storage}
+                      </h3>
+                      {getSinyalBadge(u)}
+                    </div>
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
                       {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}
                     </div>
@@ -475,9 +564,12 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
                   {/* Header row */}
                   <div className="flex items-start justify-between gap-1.5">
                     <div className="min-w-0 pr-1">
-                      <h3 className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate">
-                        {u.tipe} {u.storage}
-                      </h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate">
+                          {u.tipe} {u.storage}
+                        </h3>
+                        {getSinyalBadge(u)}
+                      </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-400 mt-0.5 font-mono truncate">
                         {u.warna} · IMEI 1: {u.imei}{u.imei2 ? ` · IMEI 2: ${u.imei2}` : ''}
                       </div>
@@ -700,6 +792,44 @@ Siap kirim ke seluruh Indonesia / COD / Datang ke store langsung.
 
                 {/* Specs */}
                 <div className="p-3 bg-white dark:bg-[#142036] border border-slate-200/70 dark:border-slate-800 rounded-2xl space-y-1.5 text-[11px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Asal & Garansi:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {unitDetail.unit.jenis_garansi === 'resmi'
+                        ? '🇮🇩 Resmi Indonesia (iBox/GDN)'
+                        : '🌐 Inter (Internasional)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Jaringan Sinyal:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {unitDetail.unit.status_sinyal === 'all_operator'
+                        ? 'All Operator'
+                        : unitDetail.unit.status_sinyal === 'smartfren_only'
+                        ? 'Smartfren Only'
+                        : 'WiFi Only (No SIM)'}
+                    </span>
+                  </div>
+                  {unitDetail.unit.jenis_garansi === 'inter' && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Kunci SIM (Lock):</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">
+                          {unitDetail.unit.status_sim_lock === 'su'
+                            ? 'SU (SIM-Lock / Butuh R-SIM)'
+                            : 'FU (Non SIM-Lock / Bebas Kartu)'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Garansi Sinyal Toko:</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200 capitalize">
+                          {unitDetail.unit.garansi_sinyal
+                            ? String(unitDetail.unit.garansi_sinyal).replace('_', ' ')
+                            : '3 bulan'}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">IMEI 1 (SIM Utama):</span>
                     <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
