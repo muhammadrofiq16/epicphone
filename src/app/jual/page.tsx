@@ -11,6 +11,9 @@ import {
   RotateCcw,
   Receipt,
   MessageCircle,
+  Radio,
+  Zap,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -46,6 +49,11 @@ function JualContent() {
   const [tradeInImei, setTradeInImei] = useState('');
   const [tradeInHarga, setTradeInHarga] = useState<string>('');
 
+  // Upgrade Sinyal (Khusus Unit WiFi Only)
+  const [isUpgradeSinyal, setIsUpgradeSinyal] = useState(false);
+  const [biayaModalImei, setBiayaModalImei] = useState<string>('');
+  const [garansiSinyalUpgrade, setGaransiSinyalUpgrade] = useState('3_bulan');
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -78,6 +86,9 @@ function JualContent() {
 
   const selectUnit = (unit: Unit) => {
     setSelectedUnit(unit);
+    setIsUpgradeSinyal(false);
+    setBiayaModalImei('');
+    setGaransiSinyalUpgrade('3_bulan');
     if (unit.harga_jual_rekomendasi) {
       setHargaJual(unit.harga_jual_rekomendasi.toLocaleString('id-ID'));
     } else if (unit.hpp && isOwner) {
@@ -91,7 +102,8 @@ function JualContent() {
   const numTradeInPotongan = isTradeIn ? Number(tradeInHarga.replace(/\D/g, '')) || 0 : 0;
   const numUangDiterima = Math.max(0, numHargaAkhir - numTradeInPotongan);
 
-  const unitHpp = selectedUnit?.hpp || 0;
+  const numBiayaModalImei = isUpgradeSinyal ? Number(biayaModalImei.replace(/\D/g, '')) || 0 : 0;
+  const unitHpp = (selectedUnit?.hpp || 0) + numBiayaModalImei;
   const estimatedProfit = numHargaAkhir - unitHpp;
   const isLoss = isOwner && selectedUnit && estimatedProfit < 0;
   const isMarginThin = isOwner && selectedUnit && estimatedProfit >= 0 && estimatedProfit < 200000;
@@ -126,6 +138,13 @@ function JualContent() {
           catatan,
           pencatat_id: currentUser?.id || 1,
           tipe_transaksi: isTradeIn ? 'tukar_tambah' : 'reguler',
+          upgrade_sinyal: isUpgradeSinyal
+            ? {
+                status_sinyal: 'all_operator',
+                garansi_sinyal: garansiSinyalUpgrade,
+                biaya_modal_imei: numBiayaModalImei,
+              }
+            : undefined,
           trade_in: isTradeIn
             ? {
                 tipe: tradeInTipe,
@@ -289,6 +308,81 @@ function JualContent() {
               </div>
             )}
           </div>
+
+          {/* Paket Upgrade Sinyal (Khusus Unit WiFi Only) */}
+          {selectedUnit && selectedUnit.status_sinyal === 'wifi_only' && (
+            <div className="bg-gradient-to-br from-blue-50/90 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 rounded-2xl p-4 border border-blue-200 dark:border-blue-800 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-600 text-white shrink-0">
+                    <Radio size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-xs">
+                      Upgrade ke All Operator (Paket Sinyal)
+                    </h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Unit ini berstatus <strong>WiFi Only</strong>. Aktifkan jika pembeli meminta paket All Operator.
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={isUpgradeSinyal}
+                    onChange={(e) => setIsUpgradeSinyal(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {isUpgradeSinyal && (
+                <div className="pt-2.5 border-t border-blue-200/80 dark:border-blue-800/80 space-y-2.5 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Garansi Sinyal ke Pembeli */}
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-[10px]">
+                        Garansi Sinyal Pembeli
+                      </label>
+                      <select
+                        value={garansiSinyalUpgrade}
+                        onChange={(e) => setGaransiSinyalUpgrade(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-medium"
+                      >
+                        <option value="3_bulan">Garansi Sinyal 3 Bulan (Pilihan Anda)</option>
+                        <option value="1_bulan">Garansi Sinyal 1 Bulan</option>
+                        <option value="6_bulan">Garansi Sinyal 6 Bulan</option>
+                        <option value="1_tahun">Garansi Sinyal 1 Tahun</option>
+                        <option value="selamanya">Garansi Sinyal Selamanya</option>
+                      </select>
+                    </div>
+
+                    {/* Biaya Modal Tembak IMEI (Toko) */}
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-[10px]">
+                        Modal Tembak IMEI (HPP Toko)
+                      </label>
+                      <input
+                        type="text"
+                        value={biayaModalImei}
+                        onChange={(e) => {
+                          const num = e.target.value.replace(/\D/g, '');
+                          setBiayaModalImei(num ? Number(num).toLocaleString('id-ID') : '');
+                        }}
+                        placeholder="Rp 0 (biaya vendor)"
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-mono font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-blue-700 dark:text-blue-300 leading-relaxed bg-blue-100/60 dark:bg-blue-900/30 p-2 rounded-xl border border-blue-200/50 dark:border-blue-800/40">
+                    💡 <strong>Otomatis:</strong> Nota resmi WhatsApp pembeli akan langsung tertulis sebagai <strong>Inter All Operator (Garansi Sinyal: {garansiSinyalUpgrade.replace('_', ' ')})</strong>. Modal tembak IMEI akan menambah HPP unit agar kalkulasi laba bersih toko tetap akurat.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Step 3: Pembeli & Garansi */}
           {selectedUnit && (

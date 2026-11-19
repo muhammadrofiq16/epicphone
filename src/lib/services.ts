@@ -684,6 +684,11 @@ export async function createSale(data: {
   catatan?: string;
   pencatat_id: number;
   tipe_transaksi?: 'reguler' | 'tukar_tambah';
+  upgrade_sinyal?: {
+    status_sinyal: 'all_operator' | 'smartfren_only';
+    garansi_sinyal: string;
+    biaya_modal_imei?: number;
+  };
   trade_in?: {
     tipe: string;
     storage: string;
@@ -712,7 +717,49 @@ export async function createSale(data: {
 
   const diskon = data.diskon || 0;
   const hargaAkhir = data.harga_jual - diskon;
-  const hppUnit = Number(unit.hpp);
+  let hppUnit = Number(unit.hpp);
+
+  // Handle Signal Upgrade on Sale (Khusus unit WiFi Only di-upgrade ke All Operator saat transaksi)
+  const upgradeSinyal = data.upgrade_sinyal;
+  let biayaModalImei = 0;
+
+  if (upgradeSinyal && upgradeSinyal.status_sinyal === 'all_operator') {
+    biayaModalImei = Number(upgradeSinyal.biaya_modal_imei) || 0;
+    hppUnit += biayaModalImei;
+
+    // Update unit signal status and HPP in database
+    await db.execute({
+      sql: `UPDATE unit 
+            SET status_sinyal = 'all_operator', 
+                garansi_sinyal = ?,
+                total_biaya_servis = total_biaya_servis + ?,
+                hpp = hpp + ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+      args: [upgradeSinyal.garansi_sinyal || '3_bulan', biayaModalImei, biayaModalImei, data.unit_id],
+    });
+
+    // If there was an operational modal cost for IMEI unlock, record it in service logs
+    if (biayaModalImei > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      await db.execute({
+        sql: `INSERT INTO servis (unit_id, tanggal, kerusakan, sparepart, biaya, teknisi_id, status, catatan)
+              VALUES (?, ?, 'Pendaftaran Sinyal All Operator (Tembak IMEI)', 'Jasa Sinyal', ?, ?, 'selesai', ?)`,
+        args: [
+          data.unit_id,
+          today,
+          biayaModalImei,
+          data.pencatat_id,
+          `Upgrade paket sinyal All Operator saat penjualan (Garansi Sinyal: ${upgradeSinyal.garansi_sinyal || '3 bulan'})`,
+        ],
+      });
+    }
+
+    // Mutate local unit object so receipt generator uses the updated values
+    unit.status_sinyal = 'all_operator';
+    unit.garansi_sinyal = upgradeSinyal.garansi_sinyal || '3_bulan';
+  }
+
   const labaKotor = hargaAkhir - hppUnit;
 
   // Handle Trade-in (Tukar Tambah)
@@ -845,6 +892,11 @@ export async function createSale(data: {
     return `Inter All Operator (${simLockText} · Garansi Sinyal: ${garansiStr})`;
   })();
 
+  const garansiSinyalLine =
+    unit.jenis_garansi === 'inter' && unit.status_sinyal === 'all_operator'
+      ? `\n📶 *GARANSI SINYAL IMEI: ${(unit.garansi_sinyal ? String(unit.garansi_sinyal).replace('_', ' ') : '3 bulan').toUpperCase()}*`
+      : '';
+
   const waText = `🧾 *NOTA RESMI ${settings.nama_toko.toUpperCase()}*
 ---------------------------------------
 No. Nota: ${nomorNota}
@@ -861,7 +913,7 @@ Harga    : ${rupiah(data.harga_jual)}
 ${diskon > 0 ? `Diskon   : -${rupiah(diskon)}\n` : ''}${tradeInPotongan > 0 ? `Tukar Tambah : -${rupiah(tradeInPotongan)}\n` : ''}*TOTAL DIBAYAR: ${rupiah(uangDiterima)}*
 Metode   : ${data.metode_bayar.toUpperCase()} (${statusBayar.toUpperCase()})
 ---------------------------------------
-🛡️ *GARANSI TOKO: ${data.garansi_hari || 30} HARI*
+🛡️ *GARANSI TOKO: ${data.garansi_hari || 30} HARI*${garansiSinyalLine}
 Berlaku hingga: ${garansiTgl}
 Syarat: Segel utuh, tidak jatuh/kena air.
 
